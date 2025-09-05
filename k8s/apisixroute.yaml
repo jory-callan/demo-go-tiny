@@ -1,0 +1,23 @@
+# apisixroute.yaml
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: demo-route
+spec:
+  http:
+  - name: demo
+    match:
+      hosts:
+      - demo.local
+      paths:
+      - /*
+    backends:
+    - serviceName: demo-go-tiny
+      servicePort: 80
+    plugins:
+    - name: limit-req
+      enable: true
+      config:
+        rate: 100
+        burst: 50
+        key: remote_addr
