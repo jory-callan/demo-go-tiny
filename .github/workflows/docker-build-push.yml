@@ -11,46 +11,35 @@ jobs:
     permissions:
       contents: read
       packages: write
-
     steps:
+      - name: Debug info
+        run: |
+          echo "Actor: ${{ github.actor }}"
+          echo "Repository: ${{ github.repository }}"
+          echo "Repository Owner: ${{ github.repository_owner }}"
+          echo "actor: ${{ github.actor }}"
+          echo "Event Name: ${{ github.event_name }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "Tag: ${{ steps.extract_tag.outputs.VERSION }}"
       - name: Checkout repository
         uses: actions/checkout@v4
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
       - name: Extract tag name
         id: extract_tag
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      # - name: Log in to Docker Hub
-      #   uses: docker/login-action@v3
-      #   with:
-      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
-      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
-      #   continue-on-error: true
-
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
+          platforms: linux/amd64,linux/arm64/v8
           tags: |
             ghcr.io/${{ github.repository }}:${{ steps.extract_tag.outputs.VERSION }}
             ghcr.io/${{ github.repository }}:latest
-          labels: |
-            org.opencontainers.image.title=${{ github.event.repository.name }}
-            org.opencontainers.image.description=${{ github.event.repository.description }}
-            org.opencontainers.image.url=${{ github.event.repository.html_url }}
-            org.opencontainers.image.source=${{ github.event.repository.clone_url }}
-            org.opencontainers.image.version=${{ steps.extract_tag.outputs.VERSION }}
-            org.opencontainers.image.created=${{ env.GITHUB_SHA }}
-            org.opencontainers.image.revision=${{ env.GITHUB_SHA }}
-            org.opencontainers.image.licenses=${{ github.event.repository.license.spdx_id }}
