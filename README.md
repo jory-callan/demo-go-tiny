@@ -13,8 +13,8 @@
 | `/ip` | GET | 获取客户端真实 IP（兼容 X-Real-Ip / X-Forwarded-For） | `curl http://demo.local/ip` |
 | `/env` | GET | 查看 Pod 名称、节点名、版本、启动时间 | `curl http://demo.local/env` |
 | `/delay?ms=500` | GET | 模拟延迟（ms 可改） | `curl http://demo.local/delay?ms=500` |
-| `/mem?mb=100&duration=10000` | GET | 模拟内存占用（MB 可改，可设置保持时长ms） | `curl http://demo.local/mem?mb=100&duration=10000` |
-| `/cpu?ms=1000&cores=2&percent=80` | GET | 模拟CPU占用（可控制时间、核心数和占用百分比） | `curl http://demo.local/cpu?ms=5000&cores=1&percent=100` |
+| `/mem?mb=100&ms=10000` | GET | 模拟内存占用（MB 可改，可设置保持时长ms） | `curl http://demo.local/mem?ms=20000&mb=100` |
+| `/cpu?ms=2000&cores=2&percent=80` | GET | 模拟CPU占用（可控制时间、核心数和占用百分比） | `curl http://demo.local/cpu?ms=5000&cores=1&percent=100` |
 | `/` | GET | 列出所有路由 | `curl http://demo.local/` |
 
 ---
@@ -102,7 +102,7 @@ curl http://demo.local/delay?ms=500
 curl http://demo.local/mem?mb=200
 
 # 占 100 MiB 内存，保持10秒（前5秒缓步提升，后5秒保持）
-curl http://demo.local/mem?mb=100&duration=10000
+curl http://demo.local/mem?mb=100&ms=10000
 
 # CPU测试：使用1个核心，100%占用率，持续3秒
 curl http://demo.local/cpu?ms=3000&cores=1&percent=100

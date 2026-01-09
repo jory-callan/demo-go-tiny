@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -88,61 +89,41 @@ func delay(w http.ResponseWriter, r *http.Request) {
 
 // ---------- 6. 性能：模拟内存分配 ----------
 func mem(w http.ResponseWriter, r *http.Request) {
-	// 解析参数
-	sizeMB := 1 // 默认 1 MiB
-	if n := r.URL.Query().Get("mb"); n != "" {
-		fmt.Sscanf(n, "%d", &sizeMB)
-	}
-	size := sizeMB * 1024 * 1024
-
-	// 解析保持时长参数（ms），默认0表示立即释放
-	durationMs := 0
-	if d := r.URL.Query().Get("duration"); d != "" {
-		fmt.Sscanf(d, "%d", &durationMs)
-	}
-
-	// 如果没有指定保持时长，直接分配内存后返回
-	if durationMs == 0 {
-		_ = make([]byte, size)
-		writeJSON(w, http.StatusOK, resp{Code: 0, Msg: fmt.Sprintf("allocated %d MiB", sizeMB)})
-		return
-	}
-
-	// 转换为时间类型
-	duration := time.Duration(durationMs) * time.Millisecond
-	// 计算提升阶段和保持阶段的时长
-	increaseDuration := duration / 2
-	maintainDuration := duration - increaseDuration
-
-	// 创建一个slice来存储分配的内存块，以便在goroutine结束后释放
-	var memBlocks [][]byte
-	memBlocks = append(memBlocks, make([]byte, 0)) // 初始化一个空slice
-
-	// 启动goroutine来处理内存分配
-	go func() {
-		defer func() {
-			// 释放所有内存
-			memBlocks = nil
-			runtime.GC() // 触发垃圾回收
-		}()
-
-		// 提升阶段：缓步增加内存占用
-		stepCount := 100 // 分100步提升内存
-		stepSize := size / stepCount
-		stepDuration := increaseDuration / time.Duration(stepCount)
-
-		for i := 1; i <= stepCount; i++ {
-			currentSize := i * stepSize
-			memBlocks = append(memBlocks, make([]byte, currentSize))
-			time.Sleep(stepDuration)
+	sizeMB := 1
+	if v := r.URL.Query().Get("mb"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			sizeMB = n
 		}
+	}
+	durationMs := 2000
+	if v := r.URL.Query().Get("ms"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			durationMs = n
+		}
+	}
 
-		// 保持阶段：保持内存占用
-		time.Sleep(maintainDuration)
-	}()
+	size := sizeMB * 1024 * 1024
+	buf := make([]byte, size)
 
-	// 返回响应
-	writeJSON(w, http.StatusOK, resp{Code: 0, Msg: fmt.Sprintf("allocating %d MiB over %d ms, maintaining for %d ms", sizeMB, increaseDuration.Milliseconds(), maintainDuration.Milliseconds())})
+	// 触发实际物理内存分配（可选，但推荐）
+	const page = 4096
+	for i := 0; i < len(buf); i += page {
+		buf[i] = 1 // 非零值更可靠触发分配
+	}
+
+	// 保持 buf 引用，sleep 期间不释放
+	time.Sleep(time.Duration(durationMs) * time.Millisecond)
+
+	// 手动触发 GC 以确保内存及时释放
+	buf = nil
+	runtime.GC()
+	debug.FreeOSMemory() // 强制归还空闲内存给 OS, 禁止在生产环境使用
+
+	// 此时才释放（函数返回自动释放，无需显式 GC）
+	writeJSON(w, http.StatusOK, resp{
+		Code: 0,
+		Msg:  fmt.Sprintf("allocated %d MiB for %d ms", sizeMB, durationMs),
+	})
 }
 
 // ---------- 7. 性能：模拟CPU占用 ----------
@@ -150,7 +131,7 @@ func cpu(w http.ResponseWriter, r *http.Request) {
 	// 参数解析
 	durationMs := r.URL.Query().Get("ms")
 	if durationMs == "" {
-		durationMs = "1000" // 默认1秒
+		durationMs = "2000" // 默认2秒
 	}
 	duration, _ := time.ParseDuration(durationMs + "ms")
 
@@ -230,7 +211,7 @@ func main() {
 	// 7. 根路径提示
 	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{
-			"routes": "/ping /echo /ip /env /delay?ms=100 /mem?mb=10&duration=10000 /cpu?ms=1000&cores=2&percent=80",
+			"routes": "/ping /echo /ip /env /delay?ms=100 /mem?mb=10&ms=10000 /cpu?ms=1000&cores=2&percent=80",
 		})
 	})
 
