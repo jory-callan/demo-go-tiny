@@ -1,0 +1,120 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    k8s.kuboard.cn/displayName: go-tiny
+  labels:
+    k8s.kuboard.cn/name: go-tiny
+    app-name: go-tiny
+    lang: go
+  name: go-tiny
+  namespace: default
+spec:
+  minReadySeconds: 30
+  progressDeadlineSeconds: 120
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      k8s.kuboard.cn/name: go-tiny
+      app-name: go-tiny
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        k8s.kuboard.cn/name: go-tiny
+        app-name: go-tiny
+        lang: go
+    spec:
+      containers:
+        - image: 'ghcr.io/jory-callan/demo-go-tiny:1.1'
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /ip
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 1
+          name: go-tiny
+          ports:
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /ip
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              cpu: 500m
+              memory: 150Mi
+            requests:
+              cpu: 100m
+              memory: 50Mi
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations: {}
+  labels:
+    k8s.kuboard.cn/name: go-tiny
+    app-name: go-tiny
+  name: go-tiny
+  namespace: default
+spec:
+  externalIPs: []
+  ports:
+    - name: dt3k7d
+      port: 80
+      protocol: TCP
+      targetPort: 8080
+  selector:
+    k8s.kuboard.cn/name: go-tiny
+    app-name: go-tiny
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+  type: ClusterIP
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  labels:
+    k8s.kuboard.cn/name: go-tiny
+    app-name: go-tiny
+  name: go-tiny
+  namespace: default
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: go-tiny.demo.local
+      http:
+        paths:
+          - backend:
+              service:
+                name: go-tiny
+                port:
+                  number: 80
+            path: /
+            pathType: Prefix
+
